@@ -152,4 +152,32 @@ modelo1 <- rpart(Departamento_F ~ Sexo + Plan_Est + Repitente, Jornada_Est,
                      data = train, 
                      method = "class")
 
+train_data <- train
+train_data <- cbind(train_data, model.matrix(~Departamento_F - 1, data = train))
+train_data <- train_data[, -1]  # Eliminar la columna original 'Departamento'
 
+
+response_var <- "Plan_Est"
+predictors <- setdiff(colnames(train_data), response_var)
+
+formula <- as.formula(paste(response_var, "~", paste(predictors, collapse = " + ")))
+
+print(formula)
+
+nn_model <- neuralnet(formula, data = train_data, hidden = c(5, 3), linear.output = FALSE)
+
+
+# Visualizar el modelo
+plot(nn_model, main = "Red Neuronal")
+
+
+#predicciones
+
+# Predicciones
+predictions <- compute(nn_model, train_data[, predictors])
+
+# Convertir resultados de predicción a la clase más probable
+predicted_class <- apply(predictions$net.result, 1, which.max)
+
+# Comparar con la variable real
+table(Predicted = predicted_class, Actual = train_data[[response_var]])
