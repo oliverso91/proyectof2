@@ -1,0 +1,198 @@
+#instalacion de paquetes a utilizar 
+install.packages("haven")
+install.packages("rpart")
+install.packages("rpart.plot")
+
+#utilizar las librerias necesarias 
+library(haven)
+library(rpart)
+library(rpart.plot)
+
+##carga de archivos para el dataset
+
+# Cambia "ruta/del/archivo.sav" por la ruta a tu archivo SPSS
+data <- read_sav("/Users/oliverrodas/Documents/tar/mdd/educacion_formal.sav")
+
+# Verifica los datos cargados
+print(head(data))
+
+#se realizar el primer arbol
+arbol <- rpart(Grado ~
+                 Jornada_Est+
+                 Graduando+
+                 Plan_Est+
+                 Sector,
+               data = data, method = "class")
+
+
+rpart.plot(arbol, type=2, extra=0, under = TRUE, fallen.leaves = TRUE, box.palette = "BuGn", 
+           main ="Predicción de area", cex = 1)
+
+#se realizar el segundo arbol
+
+arbol <- rpart(Sector ~
+                 Sexo+
+                 Plan_Est+
+                 Jornada_Est+
+                 Resultado_F,
+               data = data, method = "class")
+
+rpart.plot(arbol, type=2, extra=0, under = TRUE, fallen.leaves = TRUE, box.palette = "BuGn", 
+           main ="Predicción de area", cex = 1)
+
+
+#se realizar el tercer arbol
+#Alta verapaz
+dataFP2D <- subset(data, Departamento_F == 16)
+
+dataFP2D <- na.omit(dataFP2D)
+
+arbol <- rpart(Departamento_F ~
+                 Sector+
+                 Grado+
+                 Pueblo_Per+
+                 Graduando,
+               data = data, method = "class")
+
+rpart.plot(arbol, type=2, extra=0, under = TRUE, fallen.leaves = TRUE, box.palette = "BuGn", 
+           main ="Predicción de area", cex = 1)
+
+#se realizar el cuarto arbol
+
+dataFP2D <- subset(data, Departamento_F == 16)
+
+dataFP2D <- na.omit(dataFP2D)
+
+arbol <- rpart(Departamento_F ~
+                 Área,
+                 Sexo+
+                 Plan_Est+
+                 Repitente+
+                 Jornada_Est,
+               data = data, method = "class")
+
+rpart.plot(arbol, type=2, extra=0, under = TRUE, fallen.leaves = TRUE, box.palette = "BuGn", 
+           main ="Predicción de area", cex = 1)
+
+#RANDOMFOREST
+
+#instalacion de paquetes
+install.packages("randomForest")
+
+#uso de las librerias
+library(randomForest)
+
+#se carga la data para el bosque 
+
+# Toma una muestra aleatoria (la carga de todos los datos excede la memoria de la computadora)
+
+small_data <- data[sample(nrow(data), size = 100000), ]  
+
+bosque_data <- small_data[, c("Departamento_F", "Área", "Sexo", "Plan_Est", "Repitente", "Jornada_Est")]
+
+bosque_data$Departamento_F <- as.factor(bosque_data$Departamento_F)
+
+#se le da la cantidad nodos
+set.seed(100)
+
+#se inicia con la carga de datos para el entreno del bosque 
+bosque_data <- bosque_data[sample(1:nrow(bosque_data)),]
+
+index <-sample(1:nrow(bosque_data), 0.8*nrow(bosque_data))
+
+train <- bosque_data[index,]
+test <- bosque_data[-index,]
+
+#se realiza la aplicacion del algoritmo
+bosque <- randomForest(Departamento_F ~ Sexo + Plan_Est + Repitente,
+                       data = train,
+                       ntree = 1000,
+                       mtry = 10
+)
+
+#se realiza el entreno 
+entreno <- predict(bosque, test)
+getOption("max.print")
+
+#se realizan las pruebas necesarias cambiando los datos obtenidos del entreno
+dato_nuevo <- data.frame(
+  Área=2,
+  Sexo=2,
+  Plan_Est=5,
+  Repitente=2,
+  Jornada_Est=4
+)
+
+#prediccion final
+prediccion <- predict(bosque, dato_nuevo)
+prediccion
+
+dato_nuevo <- data.frame(
+  Área=2,
+  Sexo=1,
+  Plan_Est=3,
+  Repitente=1,
+  Jornada_Est=9
+)
+
+#prediccion final -las variables pueden ser reemplazdas con otros nombres
+prediccion <- predict(bosque, dato_nuevo)
+prediccion
+
+#realizar grafica
+# Importancia de variables
+varImpPlot(bosque, main = "Nivel de Escolaridad en entreno")
+
+
+#REDES NEURONALES
+
+#Instalacion de paquetes
+install.packages("neuralnet") 
+install.packages("caret")  
+
+#uso de librerias 
+library(neuralnet)
+library(caret)
+
+#creacion de dataset de la red neuronal
+red_neuronal <- createDataPartition(bosque_data$Departamento_F, p = 0.7, list = FALSE)
+
+#se realiza el inicio entreno de la red
+
+train <- bosque_data[red_neuronal,]
+test <- bosque_data[-red_neuronal,]
+
+
+#Interpretacion de los datos
+modelo1 <- rpart(Departamento_F ~ Sexo + Plan_Est + Repitente, Jornada_Est,
+                     data = train, 
+                     method = "class")
+
+#se modifica el dataset para el uso de los departamentos correctamente
+train_data <- train
+train_data <- cbind(train_data, model.matrix(~Departamento_F - 1, data = train))
+train_data <- train_data[, -1]  # Eliminar la columna original 'Departamento'
+
+#se corrigen los datos para no generar conflicto en el entreno
+response_var <- "Plan_Est"
+predictors <- setdiff(colnames(train_data), response_var)
+
+formula <- as.formula(paste(response_var, "~", paste(predictors, collapse = " + ")))
+
+print(formula)
+
+#se realiza el entreno final 
+nn_model <- neuralnet(formula, data = train_data, hidden = c(5, 3), linear.output = FALSE)
+
+
+# Visualizar el modelo
+plot(nn_model, main = "Red Neuronal")
+
+# se realizan las Predicciones
+predictions <- compute(nn_model, train_data[, predictors])
+
+# Convertir resultados de predicción a la clase más probable
+predicted_class <- apply(predictions$net.result, 1, which.max)
+
+# Comparar con la variable real
+table(Predicted = predicted_class, Actual = train_data[[response_var]])
