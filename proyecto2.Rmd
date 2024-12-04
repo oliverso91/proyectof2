@@ -143,6 +143,7 @@ prediccion
 # Importancia de variables
 varImpPlot(bosque, main = "Nivel de Escolaridad en entreno")
 
+#####se hizo el uso de R para redes neuronales ya que para Python hay conocimientos basicos de este tema.
 
 #REDES NEURONALES
 
