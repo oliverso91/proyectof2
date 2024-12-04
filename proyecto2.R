@@ -169,10 +169,6 @@ nn_model <- neuralnet(formula, data = train_data, hidden = c(5, 3), linear.outpu
 
 # Visualizar el modelo
 plot(nn_model, main = "Red Neuronal")
-
-
-#predicciones
-
 # Predicciones
 predictions <- compute(nn_model, train_data[, predictors])
 
